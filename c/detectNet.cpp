@@ -787,6 +787,10 @@ int detectNet::Detect( void* input, uint32_t width, uint32_t height, imageFormat
 			if( object_data[2] < mCoverageThreshold )
 				continue;
 
+
+			if ( mExpectedClassIDs.count((uint32_t)object_data[1]) == 0 )
+				continue;
+
 			detections[numDetections].Instance   = numDetections; //(uint32_t)object_data[0];
 			detections[numDetections].ClassID    = (uint32_t)object_data[1];
 			detections[numDetections].Confidence = object_data[2];

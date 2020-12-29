@@ -26,6 +26,8 @@
 
 #include "tensorNet.h"
 
+#include <set>
+
 
 /**
  * Name of default input blob for DetectNet caffe model.
@@ -402,7 +404,17 @@ public:
 	/**
 	 * Set the minimum threshold for detection.
 	 */
-	inline void SetThreshold( float threshold ) 					{ mCoverageThreshold = threshold; }
+	inline void SetThreshold( float threshold ) 				{ mCoverageThreshold = threshold; }
+
+	/**
+	 * Add classId to expected class id vector.
+	 */
+	inline void AddExpectedClassID( uint32_t classId ) 			{ mExpectedClassIDs.insert(classId); }
+
+	/**
+	 * Reset Expected ClassIds.
+	 */
+	inline void ResetExpectedClassIDs() 						{ mExpectedClassIDs.clear(); }
 
 	/**
 	 * Retrieve the maximum number of simultaneous detections the network supports.
@@ -487,6 +499,8 @@ protected:
 
 	std::string mClassPath;
 	uint32_t	  mNumClasses;
+
+	std::set<uint32_t> mExpectedClassIDs;
 
 	Detection* mDetectionSets[2];	// list of detections, mNumDetectionSets * mMaxDetections
 	uint32_t   mDetectionSet;	// index of next detection set to use

@@ -28,6 +28,8 @@
 
 #include "../../utils/python/bindings/PyCUDA.h"
 
+#include <set>
+
 
 typedef struct {
 	PyObject_HEAD
@@ -566,12 +568,34 @@ static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject 
 }
 
 
+void classIdsFromStr(const char * classids_str, std::set<uint32_t>& ret)
+{
+	std::string s = classids_str;
+	std::string delimiter = ",";
+
+	if (!s.empty())
+	{
+		size_t pos = 0;
+		std::string token;
+		while ((pos = s.find(delimiter)) != std::string::npos) {
+			token = s.substr(0, pos);
+			uint32_t i_dec = std::stoi(token);
+			ret.insert(i_dec);
+			s.erase(0, pos + delimiter.length());
+		}
+		uint32_t i_dec = std::stoi(s);
+		ret.insert(i_dec);
+	}
+}
+
 #define DOC_DETECT   "Detect objects in an RGBA image and return a list of detections.\n\n" \
 				 "Parameters:\n" \
 				 "  image   (capsule) -- CUDA memory capsule\n" \
 				 "  width   (int)  -- width of the image (in pixels)\n" \
 				 "  height  (int)  -- height of the image (in pixels)\n" \
 				 "  overlay (str)  -- combination of box,labels,none flags (default is 'box')\n\n" \
+				 "  format (str)  -- format\n\n" \
+				 "  classids (str)  -- combination of box,labels,none flags (default is 'box')\n\n" \
 				 "Returns:\n" \
 				 "  [Detections] -- list containing the detected objects (see detectNet.Detection)"
 
@@ -592,9 +616,10 @@ static PyObject* PyDetectNet_Detect( PyDetectNet_Object* self, PyObject* args, P
 
 	const char* overlay    = "box,labels,conf";
 	const char* format_str = "rgba32f";
-	static char* kwlist[]  = {"image", "width", "height", "overlay", "format", NULL};
+	const char* classids_str = "";
+	static char* kwlist[]  = {"image", "width", "height", "overlay", "format", "classids", NULL};
 
-	if( !PyArg_ParseTupleAndKeywords(args, kwds, "O|iiss", kwlist, &capsule, &width, &height, &overlay, &format_str))
+	if( !PyArg_ParseTupleAndKeywords(args, kwds, "O|iisss", kwlist, &capsule, &width, &height, &overlay, &format_str, &classids_str))
 	{
 		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet.Detect() failed to parse args tuple");
 		return NULL;
@@ -602,6 +627,9 @@ static PyObject* PyDetectNet_Detect( PyDetectNet_Object* self, PyObject* args, P
 
 	// parse format string
 	imageFormat format = imageFormatFromStr(format_str);
+
+	std::set<uint32_t> classids{};
+	classIdsFromStr(classids_str, classids);
 
 	// get pointer to image data
 	void* ptr = PyCUDA_GetImage(capsule, &width, &height, &format);
@@ -611,6 +639,12 @@ static PyObject* PyDetectNet_Detect( PyDetectNet_Object* self, PyObject* args, P
 
 	// run the object detection
 	detectNet::Detection* detections = NULL;
+
+	self->net->ResetExpectedClassIDs();
+	for (uint32_t cid : classids)
+	{
+		self->net->AddExpectedClassID(cid);
+	}
 
 	const int numDetections = self->net->Detect(ptr, width, height, format, &detections, detectNet::OverlayFlagsFromStr(overlay));
 
